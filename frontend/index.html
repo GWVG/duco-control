@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Duco Control</title>
+  <meta name="theme-color" content="#0f668c">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Duco Control</h1>
+    <!-- Filled in dynamically from /status once the device model is known
+         (see app.js) -- no model hardcoded here, so this works unmodified
+         against any Duco device the backend can reach. Hidden until then. -->
+    <p class="subtitle" id="device-subtitle" hidden></p>
+  </header>
+
+  <main>
+    <!-- Status block: the replacement for the info DucoHome spreads across two screens -->
+    <section id="status-card" class="card" aria-live="polite">
+      <h2>Status</h2>
+      <div id="status-error" class="error" hidden></div>
+      <dl class="status-grid" id="status-grid">
+        <div class="stat">
+          <dt>Outside</dt>
+          <dd id="temp-outside">&ndash;</dd>
+        </div>
+        <div class="stat">
+          <!-- "Inside" shows tempExtractCelsius: the air extracted from the
+               living space is the best, most direct proxy this device
+               measures for indoor temperature. Supply/exhaust remain
+               available in SystemStatus (see backend), just not shown
+               here -- four temperatures are hard to interpret for an
+               end user without a ventilation diagram. -->
+          <dt>Inside</dt>
+          <dd id="temp-extract">&ndash;</dd>
+        </div>
+        <div class="stat">
+          <dt>Humidity</dt>
+          <dd id="humidity">&ndash;</dd>
+        </div>
+        <div class="stat">
+          <dt>Filter</dt>
+          <dd id="filter-days">&ndash;</dd>
+        </div>
+        <div class="stat">
+          <dt>Bypass</dt>
+          <dd id="bypass">&ndash;</dd>
+        </div>
+        <div class="stat">
+          <dt>Current setting</dt>
+          <dd id="current-state">&ndash;</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- Controls -->
+    <section class="card">
+      <h2>Set ventilation</h2>
+
+      <div class="control">
+        <span class="control-label">Level</span>
+        <!-- The DucoBox has no free percentage, only three fixed levels
+             (see the VentilationState comments in the backend) -- hence
+             three buttons instead of a slider. data-level ties each button
+             to the level app.js sends to the backend. -->
+        <div class="level-selector" id="level-selector" role="group" aria-label="Ventilation level">
+          <button type="button" class="level-button" data-level="1">Low<span>15%</span></button>
+          <button type="button" class="level-button" data-level="2">Medium<span>50%</span></button>
+          <button type="button" class="level-button" data-level="3">High<span>100%</span></button>
+        </div>
+      </div>
+
+      <div class="control">
+        <span class="control-label">Duration</span>
+        <!-- A freely draggable radial picker instead of a dropdown -- see
+             app.js for the pointer-position-to-duration math. The center
+             (a small dead zone) means "unlimited"; dragging out onto the
+             ring picks an exact whole-minute duration based on the angle. -->
+        <div class="duration-dial" id="duration-dial" role="slider"
+             aria-label="Duration" aria-valuemin="0" aria-valuemax="180" aria-valuenow="0">
+          <svg viewBox="0 0 200 200" width="200" height="200">
+            <circle class="dial-track" cx="100" cy="100" r="80"></circle>
+            <circle class="dial-progress" id="dial-progress" cx="100" cy="100" r="80"></circle>
+            <circle class="dial-handle" id="dial-handle" cx="100" cy="100" r="12"></circle>
+          </svg>
+          <div class="dial-label" id="dial-label">&infin;</div>
+        </div>
+      </div>
+
+      <button id="set-button" type="button">Set</button>
+      <div id="set-feedback" class="feedback" hidden></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+target/
+dependency-reduced-pom.xml
+*.class
+
+# Local Claude Code session config -- not part of the published project,
+# and its permission log references machine-local paths/commands.
+.claude/
