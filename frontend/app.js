@@ -1,20 +1,21 @@
-// Talks exclusively to our own Java backend (same origin, so plain relative
-// paths -- never directly to the DucoBox).
-
 const levelButtons = document.querySelectorAll(".level-button");
 const setButton = document.getElementById("set-button");
 const setFeedback = document.getElementById("set-feedback");
 const statusError = document.getElementById("status-error");
 
-// No free percentage anymore (the DucoBox doesn't know that either, see
-// backend) -- just remember which of the three buttons is active.
-let selectedLevel = 1;
+// Mirrors VentilationState's level-to-percentage mapping, for display only.
+const LEVEL_PERCENTAGES = { 1: 15, 2: 50, 3: 100 };
+
+// null until the user picks a level; Set stays disabled until then.
+let selectedLevel = null;
 selectLevelButton(selectedLevel);
+setButton.disabled = true;
 
 levelButtons.forEach((button) => {
   button.addEventListener("click", () => {
     selectedLevel = Number(button.dataset.level);
     selectLevelButton(selectedLevel);
+    setButton.disabled = false;
   });
 });
 
@@ -25,59 +26,63 @@ function selectLevelButton(level) {
 }
 
 // --- Duration dial -----------------------------------------------------
-//
-// A freely draggable radial picker: the center is "unlimited" (matches the
-// backend's durationMinutes=0 sentinel), and dragging out onto the ring
-// picks an exact whole-minute duration from the angle. Unlike the level
-// buttons, there's no snapping here on purpose -- the backend now accepts
-// any whole minute for durations that don't match a native box timer (see
-// VentilationCommandPlanner), so there's nothing to snap TO except at the
-// very center.
+// Freely draggable radial picker. Center = unlimited (durationMinutes=0).
+// Dragging onto the ring picks a whole-minute duration from the angle,
+// counting past 360° instead of wrapping, shown as stacked "lap" rings.
 
 const dial = document.getElementById("duration-dial");
 const dialHandle = document.getElementById("dial-handle");
-const dialProgress = document.getElementById("dial-progress");
-const dialLabel = document.getElementById("dial-label");
+const dialLapCircles = [
+  document.getElementById("dial-lap-0"),
+  document.getElementById("dial-lap-1"),
+  document.getElementById("dial-lap-2"),
+  document.getElementById("dial-lap-3"),
+];
+const dialValue = document.getElementById("dial-value");
+const dialEndTime = document.getElementById("dial-end-time");
 
 const DIAL_VIEWBOX_SIZE = 200; // must match the SVG viewBox in index.html
-const DIAL_RING_RADIUS = 80; // must match the <circle r="80"> in index.html
+const DIAL_RING_RADIUS = 80; // must match the lap circles' r="" in index.html
 const DIAL_DEAD_ZONE_RADIUS = 20; // viewBox units around the center that count as "unlimited"
-// One full turn of the dial = this many minutes. A UI-only ceiling, chosen
-// as a practical range for a temporary ventilation boost -- independent of
-// VentilationCommandPlanner.MAX_DURATION_MINUTES (1440), which is a
-// separate, more generous safety cap on the backend. Change this one
-// constant to offer a longer or shorter single-turn range.
-const DIAL_MAX_MINUTES = 180;
+const DIAL_MINUTES_PER_LAP = 60; // one full 360° turn = 1 hour
+const DIAL_MAX_LAPS = dialLapCircles.length; // UI ceiling; backend cap is VentilationCommandPlanner.MAX_DURATION_MINUTES
+const DIAL_MAX_DEGREES = DIAL_MAX_LAPS * 360;
+const DIAL_MAX_MINUTES = DIAL_MAX_LAPS * DIAL_MINUTES_PER_LAP;
 
-let selectedDurationMinutes = 0; // 0 = unlimited, same sentinel the backend uses
+let dialState = { minutes: 0, cumulativeDegrees: 0, rawAngleDegrees: null };
+let selectedDurationMinutes = 0; // kept in sync with dialState.minutes
 
 /**
- * Converts a pointer position -- given as (dx, dy) offsets from the dial's
- * center, in the SVG's own 200x200 viewBox units -- into a duration: either
- * null (unlimited, inside the dead zone) or a whole number of minutes from
- * 1 to DIAL_MAX_MINUTES.
- *
- * Deliberately a pure function (no DOM reads/writes) so the angle math can
- * be sanity-checked by hand, e.g. in a plain `node` REPL, without needing a
- * browser to click through -- this project has no headless-browser testing
- * set up, so that's the practical alternative here.
+ * Advances the dial state by one pointer sample (dx, dy: offsets from the
+ * dial's center). Tracks a cumulative angle -- advancing by the shortest
+ * signed delta from the previous sample -- instead of a single instantaneous
+ * angle, so turning past 360° keeps counting instead of wrapping back to a
+ * low value. Pure function, so this can be sanity-checked with a plain
+ * `node` script simulating a drag.
  */
-function durationForOffset(dx, dy) {
+function advanceDialState(previousState, dx, dy) {
   const distance = Math.hypot(dx, dy);
   if (distance < DIAL_DEAD_ZONE_RADIUS) {
-    return null;
+    return { minutes: 0, cumulativeDegrees: 0, rawAngleDegrees: null };
   }
-  // Math.atan2(y, x) is the usual signature and measures the angle
-  // counterclockwise from 3 o'clock -- the standard math convention.
-  // Swapping the arguments to atan2(dx, -dy) instead re-measures it
-  // clockwise from 12 o'clock, i.e. the way an actual clock (and this
-  // dial) reads. Adding 360 and taking `% 360` normalizes the result to
-  // [0, 360), since atan2 alone returns negative angles for the left half.
-  const angleDegrees = (Math.atan2(dx, -dy) * (180 / Math.PI) + 360) % 360;
-  const minutes = Math.round((angleDegrees / 360) * DIAL_MAX_MINUTES);
-  // Once you're past the dead zone you're committed to a real duration --
-  // never show/send 0 minutes for a point that isn't the true center.
-  return Math.max(1, minutes);
+
+  // atan2(dx, -dy) measures degrees clockwise from 12 o'clock (vs. the
+  // standard atan2(y, x), counterclockwise from 3 o'clock).
+  const rawAngleDegrees = (Math.atan2(dx, -dy) * (180 / Math.PI) + 360) % 360;
+
+  let cumulativeDegrees;
+  if (previousState.rawAngleDegrees === null) {
+    cumulativeDegrees = rawAngleDegrees;
+  } else {
+    let delta = rawAngleDegrees - previousState.rawAngleDegrees;
+    if (delta > 180) delta -= 360;
+    if (delta <= -180) delta += 360;
+    cumulativeDegrees = previousState.cumulativeDegrees + delta;
+  }
+  cumulativeDegrees = Math.min(Math.max(cumulativeDegrees, 0), DIAL_MAX_DEGREES);
+
+  const minutes = Math.max(1, Math.round((cumulativeDegrees / 360) * DIAL_MINUTES_PER_LAP));
+  return { minutes, cumulativeDegrees, rawAngleDegrees };
 }
 
 function handleDialPointerEvent(event) {
@@ -91,18 +96,13 @@ function handleDialPointerEvent(event) {
   const dx = (event.clientX - centerX) * scale;
   const dy = (event.clientY - centerY) * scale;
 
-  const minutes = durationForOffset(dx, dy);
-  selectedDurationMinutes = minutes === null ? 0 : minutes;
-  renderDial(selectedDurationMinutes);
+  dialState = advanceDialState(dialState, dx, dy);
+  selectedDurationMinutes = dialState.minutes;
+  renderDial(dialState);
 }
 
 dial.addEventListener("pointerdown", (event) => {
-  // setPointerCapture redirects all further pointer events to `dial`
-  // regardless of where the pointer physically moves -- without it, moving
-  // the mouse/finger past the edge of the widget mid-drag would just stop
-  // firing events on it. Using Pointer Events (not separate mouse/touch
-  // handlers) means this same code drives both mouse-drag on desktop and
-  // finger-drag on a phone.
+  // setPointerCapture keeps events targeting `dial` even if the pointer moves outside it mid-drag.
   dial.setPointerCapture(event.pointerId);
   handleDialPointerEvent(event);
 });
@@ -117,39 +117,52 @@ dial.addEventListener("pointerup", (event) => {
   dial.releasePointerCapture(event.pointerId);
 });
 
-function renderDial(durationMinutes) {
-  dial.setAttribute("aria-valuenow", String(durationMinutes));
+function renderDial(state) {
+  dial.setAttribute("aria-valuenow", String(state.minutes));
 
-  if (durationMinutes === 0) {
+  if (state.minutes === 0) {
+    // Handle rests on the ring (12 o'clock) rather than the exact center, so it reads as draggable.
     dialHandle.setAttribute("cx", "100");
-    dialHandle.setAttribute("cy", "100");
-    dialLabel.textContent = "∞"; // infinity symbol
-    setDialProgress(0);
+    dialHandle.setAttribute("cy", String(100 - DIAL_RING_RADIUS));
+    dialValue.textContent = "∞";
+    hide(dialEndTime);
+    dialLapCircles.forEach((circle) => setLapProgress(circle, 0));
     return;
   }
 
-  // Clamp only for drawing the handle/progress -- e.g. a duration loaded
-  // from a previous session could exceed DIAL_MAX_MINUTES (the backend
-  // allows up to 1440), but selectedDurationMinutes itself stays exact.
-  const fraction = Math.min(durationMinutes / DIAL_MAX_MINUTES, 1);
-  const angleRadians = fraction * 2 * Math.PI; // 0 at the top, growing clockwise
-  const handleX = 100 + DIAL_RING_RADIUS * Math.sin(angleRadians);
-  const handleY = 100 - DIAL_RING_RADIUS * Math.cos(angleRadians);
-  dialHandle.setAttribute("cx", String(handleX));
-  dialHandle.setAttribute("cy", String(handleY));
-  dialLabel.textContent = formatDuration(durationMinutes);
-  setDialProgress(fraction);
+  const totalDegrees = Math.min(
+    (state.minutes / DIAL_MINUTES_PER_LAP) * 360,
+    DIAL_MAX_DEGREES
+  );
+
+  // A completed lap renders as a full circle; the active lap as a partial
+  // arc on top of it; later laps stay invisible.
+  dialLapCircles.forEach((circle, lapIndex) => {
+    const degreesIntoThisLap = Math.min(Math.max(totalDegrees - lapIndex * 360, 0), 360);
+    setLapProgress(circle, degreesIntoThisLap / 360);
+  });
+
+  const activeLapIndex = Math.min(Math.floor(totalDegrees / 360), DIAL_MAX_LAPS - 1);
+  const angleWithinLap = totalDegrees - activeLapIndex * 360;
+  const angleRadians = (angleWithinLap / 360) * 2 * Math.PI; // 0 at the top, growing clockwise
+  dialHandle.setAttribute("cx", String(100 + DIAL_RING_RADIUS * Math.sin(angleRadians)));
+  dialHandle.setAttribute("cy", String(100 - DIAL_RING_RADIUS * Math.cos(angleRadians)));
+
+  dialValue.textContent = formatDuration(state.minutes);
+  dialEndTime.textContent = `Ends at ${formatEndTime(state.minutes)}`;
+  show(dialEndTime);
 }
 
-// Classic SVG "radial progress ring" technique: stroke-dasharray splits the
-// stroke into one dash the length of the whole circle's circumference (so,
-// effectively, one unbroken dash) and one gap of length 0; stroke-dashoffset
-// then shifts where that dash starts, which -- for a single full-length
-// dash -- has the visual effect of "hiding" a fraction of the circle.
-function setDialProgress(fraction) {
+function formatEndTime(minutes) {
+  const endTime = new Date(Date.now() + minutes * 60_000);
+  return endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// stroke-dasharray = full circumference, stroke-dashoffset shifts how much of it is hidden.
+function setLapProgress(circle, fraction) {
   const circumference = 2 * Math.PI * DIAL_RING_RADIUS;
-  dialProgress.style.strokeDasharray = `${circumference}`;
-  dialProgress.style.strokeDashoffset = `${circumference * (1 - fraction)}`;
+  circle.style.strokeDasharray = `${circumference}`;
+  circle.style.strokeDashoffset = `${circumference * (1 - fraction)}`;
 }
 
 function formatDuration(minutes) {
@@ -161,7 +174,7 @@ function formatDuration(minutes) {
   return remainderMinutes === 0 ? `${hours}h` : `${hours}h ${remainderMinutes}m`;
 }
 
-renderDial(selectedDurationMinutes);
+renderDial(dialState);
 
 // --- /set ----------------------------------------------------------------
 
@@ -181,7 +194,10 @@ setButton.addEventListener("click", async () => {
     if (!response.ok) {
       throw new Error(body.error || `Unexpected error (HTTP ${response.status})`);
     }
-    showFeedback(`Set to: ${body.val}`, "success");
+    showFeedback(`Set to: ${LEVEL_PERCENTAGES[selectedLevel]}%`, "success");
+    dialState = { minutes: 0, cumulativeDegrees: 0, rawAngleDegrees: null }; // reset the dial for the next choice
+    selectedDurationMinutes = 0;
+    renderDial(dialState);
     await refreshStatus();
   } catch (err) {
     showFeedback(err.message, "error");
@@ -208,9 +224,6 @@ async function refreshStatus() {
 function renderStatus(status) {
   updateDeviceSubtitle(status.deviceModel);
 
-  // Only show Outside/Inside (Inside = tempExtractCelsius) -- Supply/Exhaust
-  // are hard to interpret for an end user without a ventilation diagram.
-  // They remain available in the /status JSON itself (SystemStatus).
   setText("temp-outside", formatTemp(status.tempOutsideCelsius));
   setText("temp-extract", formatTemp(status.tempExtractCelsius));
   setText("humidity", `${status.humidityPercent}%`);
@@ -219,9 +232,6 @@ function renderStatus(status) {
   setText("current-state", formatCurrentState(status));
 }
 
-// Shows the device model reported by the backend (e.g. "COMFORT_D400_R"),
-// or hides the subtitle entirely if it's unknown -- no model name hardcoded
-// in the HTML, so this works unmodified against any Duco device.
 function updateDeviceSubtitle(deviceModel) {
   const subtitle = document.getElementById("device-subtitle");
   if (deviceModel) {
@@ -239,11 +249,6 @@ function formatBypass(bypassActive) {
   return bypassActive ? "Open" : "Closed";
 }
 
-// Shows only the percentage ("100%"), not the internal Duco code
-// ("MAN3 (100%)") -- the MAN/CNT distinction is an implementation detail,
-// not user-facing information. If the system is in AUTO mode (no fixed
-// percentage), show "Automatic" instead of the raw Val/Mode code, for the
-// same reason.
 function formatCurrentState(status) {
   if (status.currentPercentage !== null) {
     return `${status.currentPercentage}%`;
@@ -273,7 +278,5 @@ function hide(element) {
   element.hidden = true;
 }
 
-// Load once on start, then refresh every 30s so the status block stays
-// current without needing a manual reload.
 refreshStatus();
 setInterval(refreshStatus, 30_000);

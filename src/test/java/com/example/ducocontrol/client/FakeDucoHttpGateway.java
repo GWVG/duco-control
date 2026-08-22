@@ -4,20 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Hand-written test double for DucoHttpGateway: no real network traffic,
- * just pre-configured responses per path, or an exception to simulate a
- * network failure.
- *
- * Why write this by hand instead of using Mockito? DucoHttpGateway only has
- * two methods, and the behavior we want to mimic is simple ("return this
- * string" / "throw this IOException"). A hand-written fake is then about as
- * little code as a Mockito `when(...).thenReturn(...)` setup, but reads as
- * plain Java instead of a mocking DSL -- a good exercise in seeing what a
- * mocking framework actually automates for you. Mockito would earn its
- * keep more on interfaces with many methods/calls, or when you need to
- * precisely verify how often something was called.
- */
+/** Hand-written test double for DucoHttpGateway: canned responses per path, or a thrown exception. */
 class FakeDucoHttpGateway implements DucoHttpGateway {
 
     private final Map<String, String> getResponses = new HashMap<>();

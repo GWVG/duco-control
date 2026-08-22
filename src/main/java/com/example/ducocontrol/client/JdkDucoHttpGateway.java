@@ -7,21 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-/**
- * The real implementation of DucoHttpGateway, built on java.net.http (built
- * into the JDK since Java 11 -- no extra dependency like OkHttp/Apache
- * HttpClient needed).
- *
- * Three core classes from that package:
- *  - HttpClient: the reusable "connection factory". Deliberately one
- *    instance per gateway (created in the constructor, not per request) --
- *    it manages its own connection pool and is thread-safe, so recreating
- *    it per call would only add overhead.
- *  - HttpRequest: describes a single request (method, URI, headers, body).
- *  - HttpResponse: the response; via BodyHandlers.ofString() we ask for the
- *    body to arrive as a String (variants also exist for bytes, files,
- *    streaming, ...).
- */
+/** DucoHttpGateway implementation built on java.net.http.HttpClient. */
 public class JdkDucoHttpGateway implements DucoHttpGateway {
 
     private final URI baseUri;
@@ -35,15 +21,9 @@ public class JdkDucoHttpGateway implements DucoHttpGateway {
         this.baseUri = baseUri;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
-                // Without this, HttpClient defaults to sending an HTTP/2
-                // upgrade attempt (Connection: Upgrade, HTTP2-Settings) with
-                // every plaintext http:// request. Discovered by testing
-                // this live against the DucoBox: its minimal embedded web
-                // server doesn't understand those upgrade headers and
-                // responds with a bare HTTP 400 "unable to understand
-                // request", while the exact same URL with curl (which
-                // doesn't attempt an HTTP/2 upgrade for plain http://) just
-                // returned 200. Explicitly forcing HTTP/1.1 fixes that.
+                // The DucoBox's embedded web server returns HTTP 400 if it
+                // receives an HTTP/2 upgrade attempt, which HttpClient sends
+                // by default.
                 .version(HttpClient.Version.HTTP_1_1)
                 .build();
     }
@@ -72,13 +52,6 @@ public class JdkDucoHttpGateway implements DucoHttpGateway {
         try {
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException e) {
-            // send() throws InterruptedException if the thread gets
-            // interrupted while waiting for the response. We first restore
-            // the interrupt status (Java convention: if you catch an
-            // InterruptedException without re-signaling it, you "lose" the
-            // signal that something else in the code may be waiting on) and
-            // then translate it to IOException, so DucoHttpGateway callers
-            // only have to handle one exception type.
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while waiting for DucoBox response", e);
         }

@@ -17,21 +17,12 @@
     </properties>
 
     <dependencies>
-        <!-- org.json: deliberately "thin", no annotations/reflection like
-             Jackson. JSONObject/JSONArray are simple wrappers around a
-             Map/List; you navigate the JSON structure explicitly
-             (getJSONObject("Ventilation").getString("Val")), which makes
-             what's actually happening more visible to a beginner than a
-             framework that automatically maps fields onto objects. -->
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20240303</version>
         </dependency>
 
-        <!-- JUnit 5 (Jupiter): the test framework. "scope=test" means this
-             dependency is only included when compiling/running tests, not
-             in the final application jar. -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -41,21 +32,19 @@
     </dependencies>
 
     <build>
+        <!-- Applies to every plugin's output (including the default jar
+             plugin), so the shade plugin below overwrites the SAME file
+             instead of leaving two jars behind. -->
+        <finalName>${artifactId}</finalName>
+
         <plugins>
-            <!-- surefire is the Maven plugin that makes "mvn test" actually
-                 run your JUnit tests and report the results. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
             </plugin>
 
-            <!-- shade-plugin: bundles our .class files together with the
-                 org.json dependency into one "fat jar"
-                 (target/duco-control.jar), so "java -jar" is enough to
-                 start it, no manual classpath with separate .jar files
-                 needed. Runs during mvn's "package" phase (after
-                 compile+test). -->
+            <!-- Bundles dependencies into a single runnable jar (target/duco-control.jar). -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -67,7 +56,6 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>duco-control</finalName>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.example.ducocontrol.DucoControlApp</mainClass>

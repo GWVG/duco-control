@@ -15,11 +15,8 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * POST /set: receives {"level": 1|2|3, "durationMinutes": ...} from the
- * frontend (a discrete level instead of a free percentage -- see
- * VentilationState for why), lets VentilationCommandPlanner decide which
- * Duco command that becomes, sends it, and schedules a revert to AUTO
- * itself if needed (for 1h/2h -- see VentilationCommandPlanner/AutoRevertScheduler).
+ * POST /set: receives {"level": 1|2|3, "durationMinutes": ...}, sends the
+ * resulting Duco command, and schedules a revert to AUTO if needed.
  */
 public class SetVentilationHandler implements HttpHandler {
 
@@ -70,9 +67,7 @@ public class SetVentilationHandler implements HttpHandler {
                     command.revertAfterMinutes(),
                     TimeUnit.MINUTES);
         } else {
-            // Every new /set request invalidates a previously scheduled
-            // 1h/2h revert (the user just picked something else) --
-            // cancel it, even if this new request doesn't need its own revert.
+            // A new request without its own revert still invalidates any previously scheduled one.
             revertScheduler.cancelPending();
         }
     }

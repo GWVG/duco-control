@@ -1,6 +1,7 @@
 target/
 dependency-reduced-pom.xml
 *.class
+.idea/
 
 # Local Claude Code session config -- not part of the published project,
 # and its permission log references machine-local paths/commands.

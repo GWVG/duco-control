@@ -13,14 +13,11 @@
 <body>
   <header>
     <h1>Duco Control</h1>
-    <!-- Filled in dynamically from /status once the device model is known
-         (see app.js) -- no model hardcoded here, so this works unmodified
-         against any Duco device the backend can reach. Hidden until then. -->
+    <!-- Filled in from /status once the device model is known -->
     <p class="subtitle" id="device-subtitle" hidden></p>
   </header>
 
   <main>
-    <!-- Status block: the replacement for the info DucoHome spreads across two screens -->
     <section id="status-card" class="card" aria-live="polite">
       <h2>Status</h2>
       <div id="status-error" class="error" hidden></div>
@@ -30,12 +27,6 @@
           <dd id="temp-outside">&ndash;</dd>
         </div>
         <div class="stat">
-          <!-- "Inside" shows tempExtractCelsius: the air extracted from the
-               living space is the best, most direct proxy this device
-               measures for indoor temperature. Supply/exhaust remain
-               available in SystemStatus (see backend), just not shown
-               here -- four temperatures are hard to interpret for an
-               end user without a ventilation diagram. -->
           <dt>Inside</dt>
           <dd id="temp-extract">&ndash;</dd>
         </div>
@@ -58,16 +49,11 @@
       </dl>
     </section>
 
-    <!-- Controls -->
     <section class="card">
       <h2>Set ventilation</h2>
 
       <div class="control">
         <span class="control-label">Level</span>
-        <!-- The DucoBox has no free percentage, only three fixed levels
-             (see the VentilationState comments in the backend) -- hence
-             three buttons instead of a slider. data-level ties each button
-             to the level app.js sends to the backend. -->
         <div class="level-selector" id="level-selector" role="group" aria-label="Ventilation level">
           <button type="button" class="level-button" data-level="1">Low<span>15%</span></button>
           <button type="button" class="level-button" data-level="2">Medium<span>50%</span></button>
@@ -77,18 +63,23 @@
 
       <div class="control">
         <span class="control-label">Duration</span>
-        <!-- A freely draggable radial picker instead of a dropdown -- see
-             app.js for the pointer-position-to-duration math. The center
-             (a small dead zone) means "unlimited"; dragging out onto the
-             ring picks an exact whole-minute duration based on the angle. -->
+        <!-- Radial drag picker; see app.js for the angle-to-duration math.
+             Center = unlimited. Lap rings (same radius, stacked) show
+             elapsed full turns; radius must match DIAL_RING_RADIUS in app.js. -->
         <div class="duration-dial" id="duration-dial" role="slider"
-             aria-label="Duration" aria-valuemin="0" aria-valuemax="180" aria-valuenow="0">
+             aria-label="Duration" aria-valuemin="0" aria-valuemax="240" aria-valuenow="0">
           <svg viewBox="0 0 200 200" width="200" height="200">
             <circle class="dial-track" cx="100" cy="100" r="80"></circle>
-            <circle class="dial-progress" id="dial-progress" cx="100" cy="100" r="80"></circle>
-            <circle class="dial-handle" id="dial-handle" cx="100" cy="100" r="12"></circle>
+            <circle class="dial-progress-lap dial-progress-lap-0" id="dial-lap-0" cx="100" cy="100" r="80"></circle>
+            <circle class="dial-progress-lap dial-progress-lap-1" id="dial-lap-1" cx="100" cy="100" r="80"></circle>
+            <circle class="dial-progress-lap dial-progress-lap-2" id="dial-lap-2" cx="100" cy="100" r="80"></circle>
+            <circle class="dial-progress-lap dial-progress-lap-3" id="dial-lap-3" cx="100" cy="100" r="80"></circle>
+            <circle class="dial-handle" id="dial-handle" cx="100" cy="100" r="10"></circle>
           </svg>
-          <div class="dial-label" id="dial-label">&infin;</div>
+          <div class="dial-label" id="dial-label">
+            <span id="dial-value">&infin;</span>
+            <span id="dial-end-time" class="dial-end-time" hidden></span>
+          </div>
         </div>
       </div>
 

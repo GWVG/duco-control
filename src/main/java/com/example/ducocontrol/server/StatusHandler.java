@@ -9,16 +9,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 
-/**
- * GET /status: fetches SystemStatus via DucoClient and returns it as JSON.
- * This is the replacement for the info spread across two screens in the
- * official DucoHome app.
- *
- * Implements HttpHandler -- the only method that interface requires is
- * handle(HttpExchange), called by com.sun.net.httpserver.HttpServer
- * whenever a request comes in on the path this handler is registered for
- * (see DucoControlApp).
- */
+/** GET /status: fetches SystemStatus via DucoClient and returns it as JSON. */
 public class StatusHandler implements HttpHandler {
 
     private final DucoClient ducoClient;
@@ -38,8 +29,6 @@ public class StatusHandler implements HttpHandler {
             SystemStatus status = ducoClient.fetchStatus();
             HttpExchangeSupport.writeJsonResponse(exchange, 200, toJson(status));
         } catch (DucoUnreachableException e) {
-            // 502 Bad Gateway: the correct HTTP status when WE are working
-            // fine, but the "upstream" server (the DucoBox) is unreachable.
             HttpExchangeSupport.writeErrorResponse(exchange, 502, "DucoBox unreachable: " + e.getMessage());
         }
     }
@@ -52,10 +41,6 @@ public class StatusHandler implements HttpHandler {
                 .put("tempExtractCelsius", status.tempExtractCelsius())
                 .put("tempExhaustCelsius", status.tempExhaustCelsius())
                 .put("filterDaysRemaining", status.filterDaysRemaining())
-                // Note: JSONObject.put(key, null) just removes the key
-                // (tested: {"x": null} becomes {}), instead of turning it
-                // into JSON null. JSONObject.NULL is the sentinel value
-                // org.json expects for that.
                 .put("bypassActive", orJsonNull(status.bypassActive()))
                 .put("humidityPercent", status.humidityPercent())
                 .put("currentStateVal", status.currentStateVal())
@@ -64,6 +49,7 @@ public class StatusHandler implements HttpHandler {
                 .toString();
     }
 
+    /** JSONObject.put(key, null) drops the key entirely; JSONObject.NULL is what actually serializes to JSON null. */
     private static Object orJsonNull(Object value) {
         return value == null ? JSONObject.NULL : value;
     }

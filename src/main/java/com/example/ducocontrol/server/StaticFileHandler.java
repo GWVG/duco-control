@@ -8,20 +8,12 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * Serves the frontend files (index.html, app.js, ...) on the same port as
- * /status and /set. Deliberate choice: everything on one origin (same
- * protocol+host+port) means the browser never needs to do CORS preflight
- * requests to talk to our own /status and /set -- no
- * Access-Control-Allow-Origin headers needed, one less thing to get wrong.
- */
+/** Serves the frontend files on the same origin as /status and /set, so no CORS is needed. */
 public class StaticFileHandler implements HttpHandler {
 
     private final Path rootDirectory;
 
     public StaticFileHandler(Path rootDirectory) {
-        // toAbsolutePath().normalize(): converts to a full, cleaned-up path
-        // (resolves ".."/".") so the comparison in handle() below is reliable.
         this.rootDirectory = rootDirectory.toAbsolutePath().normalize();
     }
 
@@ -37,11 +29,7 @@ public class StaticFileHandler implements HttpHandler {
             requestPath = "/index.html";
         }
 
-        // Path traversal protection: a request like "/../../etc/passwd"
-        // would, without this check, be able to read files outside the
-        // frontend directory. We resolve the requested path relative to
-        // rootDirectory, normalize it (resolves the ".."), and refuse if
-        // the result no longer lies WITHIN rootDirectory.
+        // Reject paths that resolve outside rootDirectory (path traversal, e.g. "/../../etc/passwd").
         Path resolved = rootDirectory.resolve(requestPath.substring(1)).normalize();
         if (!resolved.startsWith(rootDirectory) || !Files.isRegularFile(resolved)) {
             HttpExchangeSupport.writeErrorResponse(exchange, 404, "Not found: " + requestPath);

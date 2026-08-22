@@ -12,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-// Written before DucoClient existed (TDD red phase).
 class DucoClientTest {
 
     private static final int NODE_ID = 1;
@@ -50,9 +49,6 @@ class DucoClientTest {
         assertEquals(15, status.currentPercentage());
     }
 
-    // The core of this exercise: the gateway throws a "bare" IOException
-    // (this is what a real timeout or connection refusal would look like
-    // too), and DucoClient must translate that into our own, meaningful type.
     @Test
     void fetchStatus_whenGatewayThrowsIOException_throwsDucoUnreachableException() {
         FakeDucoHttpGateway gateway = new FakeDucoHttpGateway();
@@ -85,10 +81,6 @@ class DucoClientTest {
                 () -> client.setVentilationState(new VentilationCommand("CNT2", false, 0)));
     }
 
-    // Duco's own API responds with {"Code":4,"Result":"FAILED"} on a
-    // rejected command (this is exactly what we saw live when we sent an
-    // unsupported "Time" field). DucoClient must recognize that instead of
-    // silently assuming "success".
     @Test
     void setVentilationState_whenDucoReportsFailure_throwsDucoInvalidStateException() {
         FakeDucoHttpGateway gateway = new FakeDucoHttpGateway();

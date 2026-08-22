@@ -1,10 +1,12 @@
 :root {
-  --color-bg: #0b1f2a;
-  --color-card: #132f3f;
-  --color-accent: #14a09c;
-  --color-accent-dark: #0f668c;
-  --color-text: #eaf4f4;
-  --color-text-muted: #9fb8c2;
+  /* Based on Duco's brand green (#50b848). */
+  --color-bg: #0a100c;
+  --color-bg-end: #101c14;
+  --color-card: #16211a;
+  --color-accent: #50b848;
+  --color-accent-dark: #2f7d2a;
+  --color-text: #eef3ee;
+  --color-text-muted: #9db3a0;
   --color-error: #e05a5a;
   --radius: 14px;
 }
@@ -16,7 +18,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(160deg, var(--color-bg), #0f2836);
+  background: linear-gradient(160deg, var(--color-bg), var(--color-bg-end));
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   padding: 1.25rem;
@@ -139,9 +141,7 @@ main {
   width: 200px;
   height: 200px;
   margin: 0.25rem auto 0;
-  /* touch-action: none stops the browser's own scroll/zoom gestures from
-     competing with our pointermove-based dragging on touchscreens. */
-  touch-action: none;
+  touch-action: none; /* prevent scroll/zoom gestures while dragging */
   cursor: grab;
   user-select: none;
 }
@@ -153,18 +153,31 @@ main {
   opacity: 0.35;
 }
 
-.dial-progress {
+.dial-progress-lap {
   fill: none;
   stroke: var(--color-accent);
   stroke-width: 10;
   stroke-linecap: round;
-  /* Rotate so the stroke-dasharray/-dashoffset sweep (see app.js) starts
-     at 12 o'clock instead of an SVG circle's default 3-o'clock start
-     point, and grows clockwise to match how a clock -- and our angle
-     math -- actually works. */
-  transform: rotate(-90deg);
+  transform: rotate(-90deg); /* start the progress sweep at 12 o'clock */
   transform-origin: 100px 100px;
   transition: stroke-dashoffset 0.05s linear;
+}
+
+/* Each lap gets a hue-shifted variant of the accent color. */
+.dial-progress-lap-0 {
+  filter: hue-rotate(0deg);
+}
+
+.dial-progress-lap-1 {
+  filter: hue-rotate(35deg);
+}
+
+.dial-progress-lap-2 {
+  filter: hue-rotate(70deg);
+}
+
+.dial-progress-lap-3 {
+  filter: hue-rotate(105deg);
 }
 
 .dial-handle {
@@ -177,11 +190,22 @@ main {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
-  font-weight: 700;
+  gap: 0.15rem;
   pointer-events: none;
+}
+
+#dial-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.dial-end-time {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
 }
 
 button {
