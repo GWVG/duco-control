@@ -4,6 +4,7 @@ import com.example.ducocontrol.client.AutoRevertScheduler;
 import com.example.ducocontrol.client.DucoClient;
 import com.example.ducocontrol.client.DucoHttpGateway;
 import com.example.ducocontrol.client.JdkDucoHttpGateway;
+import com.example.ducocontrol.server.SetAutoHandler;
 import com.example.ducocontrol.server.SetVentilationHandler;
 import com.example.ducocontrol.server.StaticFileHandler;
 import com.example.ducocontrol.server.StatusHandler;
@@ -35,6 +36,7 @@ public class DucoControlApp {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/status", new StatusHandler(ducoClient));
         server.createContext("/set", new SetVentilationHandler(ducoClient, revertScheduler));
+        server.createContext("/auto", new SetAutoHandler(ducoClient, revertScheduler));
         server.createContext("/", new StaticFileHandler(Path.of("frontend")));
         server.setExecutor(Executors.newFixedThreadPool(4));
         server.start();
