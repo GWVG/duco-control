@@ -47,6 +47,19 @@ The node ID to control is set in `DucoControlApp` (`MAIN_NODE_ID`, default
 `1`). Run `GET /v2/info/nodes` against your own system to find the right ID
 -- node layouts vary between installations.
 
+## Checking your device's supported actions
+
+`GET /v2/action/nodes/<your-node-id>` returns the exact actions and `Val`
+values your node supports. On the device this project was built against,
+that returned:
+
+```json
+{"Node":1,"Actions":[{"Action":"SetVentilationState","ValType":"Enum","Enum":["AUTO","AUT1","AUT2","AUT3","MAN1","MAN2","MAN3","EMPT","CNT1","CNT2","CNT3","MAN1x2","MAN2x2","MAN3x2","MAN1x3","MAN2x3","MAN3x3"]},{"Action":"SetIdentify","ValType":"Boolean"}]}
+```
+
+Worth checking on your own device before assuming this project's findings
+(e.g. `VentilationState`'s Val list) apply unchanged.
+
 ## Installing as a PWA
 
 The frontend has a `manifest.webmanifest`, so the browser itself will offer
@@ -76,8 +89,10 @@ with the generated fan icon.
   (network failures), `DucoInvalidStateException` (invalid/unexpected
   states), letting the HTTP layer pick a status code by type.
 - `server/` -- the HTTP layer: `StatusHandler`, `SetVentilationHandler`,
-  `StaticFileHandler` (serves the frontend on the same origin, so no CORS
-  needed), `HttpExchangeSupport` (shared JSON/response helpers).
+  `SetAutoHandler` (`POST /auto`, sends the box back to its own automatic
+  control loop), `StaticFileHandler` (serves the frontend on the same
+  origin, so no CORS needed), `HttpExchangeSupport` (shared JSON/response
+  helpers).
 
 **Discrete levels instead of a free percentage.** The UI offers three
 buttons (Low/Medium/High = 15%/50%/100%) instead of a slider: the DucoBox

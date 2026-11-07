@@ -7,6 +7,12 @@ import com.example.ducocontrol.exception.DucoInvalidStateException;
  * CNT states are permanent (explicitly leave AUTO mode); MAN states are
  * temporary and revert to AUTO after a timer. Percentages (15/50/100) are
  * fixed by the hardware -- there's no freely settable percentage.
+ *
+ * Full set of Val values confirmed via GET /v2/action/nodes/&lt;id&gt;: AUTO,
+ * AUT1-3, MAN1-3, MAN1x2-MAN3x2, MAN1x3-MAN3x3, CNT1-3, EMPT. AUT1-3 and
+ * EMPT exist in the API but aren't used by this app (meaning not
+ * investigated). The timer (TimeStateRemain) is read-only -- there's no
+ * action to set it directly, only the MANx/MANxN variant chosen.
  */
 public enum VentilationState {
 
