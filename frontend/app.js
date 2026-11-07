@@ -1,4 +1,5 @@
 const levelButtons = document.querySelectorAll(".level-button");
+const durationControl = document.getElementById("duration-control");
 const setButton = document.getElementById("set-button");
 const setFeedback = document.getElementById("set-feedback");
 const statusError = document.getElementById("status-error");
@@ -6,22 +7,33 @@ const statusError = document.getElementById("status-error");
 // Mirrors VentilationState's level-to-percentage mapping, for display only.
 const LEVEL_PERCENTAGES = { 1: 15, 2: 50, 3: 100 };
 
-// null until the user picks a level; Set stays disabled until then.
+// null until the user picks a level; Set stays disabled until then. "auto"
+// is a valid value too, but unlike 1/2/3 it sends its command immediately
+// (see the click handler below) rather than waiting for Set.
 let selectedLevel = null;
 selectLevelButton(selectedLevel);
 setButton.disabled = true;
 
 levelButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    selectedLevel = Number(button.dataset.level);
-    selectLevelButton(selectedLevel);
-    setButton.disabled = false;
+    if (button.dataset.level === "auto") {
+      selectedLevel = "auto";
+      selectLevelButton("auto");
+      setButton.disabled = true;
+      hide(durationControl);
+      sendAutoCommand();
+    } else {
+      selectedLevel = Number(button.dataset.level);
+      selectLevelButton(selectedLevel);
+      setButton.disabled = false;
+      show(durationControl);
+    }
   });
 });
 
 function selectLevelButton(level) {
   levelButtons.forEach((button) => {
-    button.classList.toggle("selected", Number(button.dataset.level) === level);
+    button.classList.toggle("selected", button.dataset.level === String(level));
   });
 }
 
@@ -206,6 +218,21 @@ setButton.addEventListener("click", async () => {
   }
 });
 
+async function sendAutoCommand() {
+  hide(setFeedback);
+  try {
+    const response = await fetch("/auto", { method: "POST" });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(body.error || `Unexpected error (HTTP ${response.status})`);
+    }
+    showFeedback("Set to: Automatic", "success");
+    await refreshStatus();
+  } catch (err) {
+    showFeedback(err.message, "error");
+  }
+}
+
 async function refreshStatus() {
   try {
     const response = await fetch("/status");
@@ -221,8 +248,25 @@ async function refreshStatus() {
   }
 }
 
+// Only the very first /status response syncs the Auto button to reality --
+// later, periodic (30s) refreshes must not override a selection the user
+// is actively making. The Low/Medium/High buttons are never synced this
+// way; they require a deliberate Set click, so pre-marking one would imply
+// a choice the user didn't make.
+let hasSyncedInitialLevelFromStatus = false;
+
 function renderStatus(status) {
   updateDeviceSubtitle(status.deviceModel);
+
+  if (!hasSyncedInitialLevelFromStatus) {
+    hasSyncedInitialLevelFromStatus = true;
+    if (status.currentMode === "AUTO") {
+      selectedLevel = "auto";
+      selectLevelButton("auto");
+      setButton.disabled = true;
+      hide(durationControl);
+    }
+  }
 
   setText("temp-outside", formatTemp(status.tempOutsideCelsius));
   setText("temp-extract", formatTemp(status.tempExtractCelsius));

@@ -58,10 +58,12 @@
           <button type="button" class="level-button" data-level="1">Low<span>15%</span></button>
           <button type="button" class="level-button" data-level="2">Medium<span>50%</span></button>
           <button type="button" class="level-button" data-level="3">High<span>100%</span></button>
+          <!-- Sends its command immediately on click, unlike the three above -- see app.js. -->
+          <button type="button" class="level-button" data-level="auto" id="auto-button">Auto</button>
         </div>
       </div>
 
-      <div class="control">
+      <div class="control" id="duration-control">
         <span class="control-label">Duration</span>
         <!-- Radial drag picker; see app.js for the angle-to-duration math.
              Center = unlimited. Lap rings (same radius, stacked) show
